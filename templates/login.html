@@ -1,3 +1,5 @@
+{% extends "main.html" %}
+{% block content %}
 <head>
 
   <!--LOAD PRE-REQUISITES FOR GOOGLE SIGN IN -->
@@ -13,11 +15,23 @@
 
 
 <body>
-
+<div class="row top-menu">
+		<div class="col-md-10"></div>
+		<div class="col-md-2 text-right"></div>
+	</div>
+	<div class="row divider blue">
+		<div class="col-md-12"></div>
+	</div>
+	<div class="row banner main">
+		<div class="col-md-1"></div>
+		<div class="col-md-11 padding-none">
+			<h1>Photography Buying Guide</h1>
+		</div>
+	</div>
 
 <!-- GOOGLE PLUS SIGN IN-->
 
-          <div id="signInButton">
+          <div class="col-md-offset-5" id="signInButton">
           <span class="g-signin"
             data-scope="openid email"
             data-clientid="492135009481-afisd2f554o0llr38u05a941ov45skfp.apps.googleusercontent.com"
@@ -48,7 +62,7 @@ function signInCallback(authResult) {
         if (result) {
           $('#result').html('Login Successful!</br>'+ result + '</br>Redirecting...')
          setTimeout(function() {
-          window.location.href = "/restaurant";
+          window.location.href = "/category";
          }, 1000);
 
       } else if (authResult['error']) {
@@ -68,3 +82,4 @@ function signInCallback(authResult) {
   </body>
 
   </html>
+  {% endblock %}

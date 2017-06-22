@@ -1,13 +1,16 @@
 {% extends "main.html" %}
 {% block content %}
 {% include "header.html" %}
-
+	<div class="row top-menu">
+		<div class="col-md-10"></div>
+		<div class="col-md-2 text-right"></div>
+	</div>
 	<div class="row divider green">
 		<div class="col-md-12"></div>
 	</div>
 	<div class="row banner menu">
 		<div class="col-md-11 col-md-offset-1 padding-none">
-			<h1>{{ restaurant.name }}
+			<h1>{{ category.name }}
 			<figure class="creator">
 				<img src="{{ creator.picture}}">
 				<figcaption>{{ creator.name }}</figcaption>
@@ -36,13 +39,14 @@
 			{% endwith %}
 		</div>
 	</div>
+
 	{% if items !=[] %}
 		<div class="row">
 			<div class="col-md-1"></div>
 			<div class="col-md-3">
-				<h2>Appetizers</h2>
+				<h2>Canon</h2>
 					{% for i in items %}
-						{% if i.course == 'Appetizer' %}
+						{% if i.maker == 'Canon' %}
 							<div class="menu-item">
 								<h3>{{i.name}}</h3>
 								<p>{{i.description}}</p>
@@ -53,9 +57,9 @@
 					{% endfor %}
 			</div>
 			<div class="col-md-4">
-				<h2>Entrees</h2>
+				<h2>Nikon</h2>
 					{% for i in items %}
-						{% if i.course == 'Entree' %}
+						{% if i.maker == 'Nikon' %}
 						<div class="menu-item">
 							<h3>{{i.name}}</h3>
 							<p>{{i.description}}</p>
@@ -66,9 +70,9 @@
 					{% endfor %}
 			</div>
 			<div class="col-md-3">
-				<h2>Desserts</h2>
+				<h2>Sony</h2>
 					{% for i in items %}
-						{% if i.course == 'Dessert' %}
+						{% if i.maker == 'Sony' %}
 						<div class="menu-item">
 							<h3>{{i.name}}</h3>
 							<p>{{i.description}}</p>
@@ -77,9 +81,9 @@
 						</div>
 						{% endif %}
 					{% endfor %}
-				<h2>Beverages</h2>
+				<h2>Panasonic</h2>
 					{% for i in items %}
-						{% if i.course == 'Beverage' %}
+						{% if i.maker == 'Panasonic' %}
 						<div class="menu-item">
 							<h3>{{i.name}}</h3>
 							<p>{{i.description}}</p>
