@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, jsonify, url_for, flash
+from flask import Flask, render_template
+from flask import request, redirect, jsonify, url_for, flash
 
 
 from sqlalchemy import create_engine, asc
@@ -6,7 +7,8 @@ from sqlalchemy.orm import sessionmaker
 from db0 import Base, Category, MenuItem, User
 
 from flask import session as login_session
-import random, string
+import random
+import string
 
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
@@ -14,6 +16,8 @@ import httplib2
 import json
 from flask import make_response
 import requests
+
+from functools import wraps
 
 app = Flask(__name__)
 
@@ -32,6 +36,16 @@ DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
 
+# Decorator to check login status
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in login_session:
+            return redirect('/login')
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # Create anti-forgery state token
 @app.route('/login')
 def showLogin():
@@ -39,7 +53,7 @@ def showLogin():
                     for x in xrange(32))
     login_session['state'] = state
     # return "The current session state is %s" % login_session['state']
-    return render_template('login.html', STATE = state)
+    return render_template('login.html', STATE=state)
 
 
 # CONNECT
@@ -95,13 +109,13 @@ def gconnect():
     stored_credentials = login_session.get('credentials')
     stored_gplus_id = login_session.get('gplus_id')
     if stored_credentials is not None and gplus_id == stored_gplus_id:
-        response = make_response(json.dumps('Current user is already'+
-        									' connected.'), 200)
+        response = make_response(json.dumps('Current user is already' +
+                                            ' connected.'), 200)
         response.headers['Content-Type'] = 'application/json'
         return response
 
     # Store the access token in the session for later use.
-    login_session['credentials'] = credentials
+    login_session['credentials'] = credentials.access_token
     login_session['gplus_id'] = gplus_id
 
     # Get user info
@@ -168,7 +182,7 @@ def gdisconnect():
             json.dumps('Current user not connected.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
-    access_token = credentials.access_token
+    access_token = credentials
     url = 'https://accounts.google.com/o/oauth2/revoke?token=%s' % access_token
     h = httplib2.Http()
     result = h.request(url, 'GET')[0]
@@ -200,18 +214,19 @@ def showCategories():
     categories = session.query(Category).order_by(asc(Category.name))
     if 'username' not in login_session:
         return render_template('categories.html', categories=categories,
-                            logged_in=False)
+                               logged_in=False)
     else:
         return render_template('categories.html', categories=categories,
-                            	logged_in=True,
-                            	username = login_session['username'])
+                               logged_in=True,
+                               username=login_session['username'])
 
 
 # Create a new category
 @app.route('/category/new/', methods=['GET', 'POST'])
+@login_required
 def newCategory():
-    if 'username' not in login_session:
-        return redirect('/login')
+    # if 'username' not in login_session:
+    #     return redirect('/login')
     if request.method == 'POST':
         newCategory = Category(
             name=request.form['name'], user_id=login_session['user_id'])
@@ -221,17 +236,22 @@ def newCategory():
         return redirect(url_for('showCategories'))
     else:
         return render_template('newCategory.html',
-        						logged_in=True,
-        						username = login_session['username'])
+                               logged_in=True,
+                               username=login_session['username'])
 
 
 # Edit a category
 @app.route('/category/<int:category_id>/edit/', methods=['GET', 'POST'])
+@login_required
 def editCategory(category_id):
-    if 'username' not in login_session:
-        return redirect('/login')
     editedCategory = session.query(
         Category).filter_by(id=category_id).one()
+    if editedCategory.user_id != login_session['user_id']:
+        return "<script>" \
+               "function myFunction() {alert('You are not authorized" \
+               " to edit this category. Please create your own category" \
+               " in order to edit.');}" \
+               "</script><body onload='myFunction()''>"
     if request.method == 'POST':
         if request.form['name']:
             editedCategory.name = request.form['name']
@@ -239,30 +259,32 @@ def editCategory(category_id):
             return redirect(url_for('showCategories'))
     else:
         return render_template('editCategory.html', category=editedCategory,
-        						logged_in=True,
-        						username = login_session['username'])
+                               logged_in=True,
+                               username=login_session['username'])
 
 
 # Delete a category
 @app.route('/category/<int:category_id>/delete/', methods=['GET', 'POST'])
+@login_required
 def deleteCategory(category_id):
-    if 'username' not in login_session:
-        return redirect('/login')
     categoryToDelete = session.query(
         Category).filter_by(id=category_id).one()
     if categoryToDelete.user_id != login_session['user_id']:
-        return "<script>function myFunction() {alert('You are not authorized"
-        + "to delete this category. Please create your own category"
-        + " in order to delete.');}</script><body onload='myFunction()''>"
+        return "<script>" \
+               "function myFunction() {alert('You are not authorized" \
+               " to delete this category. Please create your own category" \
+               " in order to delete.');}" \
+               "</script><body onload='myFunction()''>"
     if request.method == 'POST':
         session.delete(categoryToDelete)
         flash('%s Successfully Deleted' % categoryToDelete.name)
         session.commit()
         return redirect(url_for('showCategories', category_id=category_id))
     else:
-        return render_template('deleteCategory.html', category=categoryToDelete,
-        						logged_in=True,
-        						username = login_session['username'])
+        return render_template('deleteCategory.html',
+                               category=categoryToDelete,
+                               logged_in=True,
+                               username=login_session['username'])
 
 
 # Show a category item
@@ -277,54 +299,58 @@ def showMenu(category_id):
 
     if 'username' not in login_session:
         return render_template('publicmenu.html',
-        						items=items,
-        						category=category,
-                                creator = creator,
-                                logged_in = False)
+                               items=items,
+                               category=category,
+                               creator=creator,
+                               logged_in=False)
     elif creator.id != login_session['user_id']:
         return render_template('semipublicmenu.html',
-        						items=items, category=category,
-                                creator = creator, logged_in = True,
-                                username = login_session['username'])
+                               items=items, category=category,
+                               creator=creator, logged_in=True,
+                               username=login_session['username'])
     else:
         return render_template('menu.html',
-        						items=items, category=category,
-                                creator = creator, logged_in = True,
-                                username = login_session['username'])
+                               items=items, category=category,
+                               creator=creator, logged_in=True,
+                               username=login_session['username'])
 
 
 # Create a new menu item
 @app.route('/category/<int:category_id>/menu/new/', methods=['GET', 'POST'])
+@login_required
 def newMenuItem(category_id):
-    if 'username' not in login_session:
-        return redirect('/login')
     category = session.query(Category).filter_by(id=category_id).one()
     if request.method == 'POST':
         newItem = MenuItem(user_id=category.user_id,
-        					name=request.form.get('name'),
-        					description=request.form.get('description'),
-        					price=request.form.get('price'),
-        					maker=request.form['item'],
-        					category_id=category_id)
+                           name=request.form.get('name'),
+                           description=request.form.get('description'),
+                           price=request.form.get('price'),
+                           maker=request.form['item'],
+                           category_id=category_id)
         session.add(newItem)
         session.commit()
         flash('New Menu %s Item Successfully Created' % (newItem.name))
         return redirect(url_for('showMenu', category_id=category_id))
     else:
         return render_template('newmenuitem.html',
-        						category_id=category_id,
-        						logged_in=True,
-        						username = login_session['username'])
+                               category_id=category_id,
+                               logged_in=True,
+                               username=login_session['username'])
 
 
 # Edit a menu item
 @app.route('/category/<int:category_id>/menu/<int:menu_id>/edit',
-			methods=['GET', 'POST'])
+           methods=['GET', 'POST'])
+@login_required
 def editMenuItem(category_id, menu_id):
-    if 'username' not in login_session:
-        return redirect('/login')
     editedItem = session.query(MenuItem).filter_by(id=menu_id).one()
     category = session.query(Category).filter_by(id=category_id).one()
+    if editedItem.user_id != login_session['user_id']:
+        return "<script>" \
+               "function myFunction() {alert('You are not authorized" \
+               " to edit this item. Please create your own item" \
+               " in order to edit.');}" \
+               "</script><body onload='myFunction()''>"
     if request.method == 'POST':
         if request.form.get('name'):
             editedItem.name = request.form.get('name')
@@ -340,19 +366,24 @@ def editMenuItem(category_id, menu_id):
         return redirect(url_for('showMenu', category_id=category_id))
     else:
         return render_template('editmenuitem.html', category_id=category_id,
-        						menu_id=menu_id, item=editedItem,
-        						logged_in=True,
-        						username = login_session['username'])
+                               menu_id=menu_id, item=editedItem,
+                               logged_in=True,
+                               username=login_session['username'])
 
 
 # Delete a menu item
 @app.route('/category/<int:category_id>/menu/<int:menu_id>/delete',
-			methods=['GET', 'POST'])
+           methods=['GET', 'POST'])
+@login_required
 def deleteMenuItem(category_id, menu_id):
-    if 'username' not in login_session:
-        return redirect('/login')
     category = session.query(Category).filter_by(id=category_id).one()
     itemToDelete = session.query(MenuItem).filter_by(id=menu_id).one()
+    if itemToDelete.user_id != login_session['user_id']:
+        return "<script>" \
+           "function myFunction() {alert('You are not authorized" \
+           " to delete this item. Please create your own item" \
+           " in order to delete.');}" \
+           "</script><body onload='myFunction()''>"
     if request.method == 'POST':
         session.delete(itemToDelete)
         session.commit()
@@ -360,8 +391,8 @@ def deleteMenuItem(category_id, menu_id):
         return redirect(url_for('showMenu', category_id=category_id))
     else:
         return render_template('deleteMenuItem.html', item=itemToDelete,
-        						logged_in=True,
-        						username = login_session['username'])
+                               logged_in=True,
+                               username=login_session['username'])
 
 
 # JSON APIs to view Category Information
